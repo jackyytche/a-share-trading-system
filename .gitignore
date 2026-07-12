@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Database (never push DB files)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+
+# Environment & Secrets
+.env
+*.env.local
+config.yaml
+credentials.json
+*.key
+*_pat_*
+
+# Temp / Test files
+/tmp/
+test_*.py
+fix_*.py
+_*.py
+
+# Output files (exclude html files we need for the system)
+888.txt
+*.png
+*.jpg
+*.zip
+factor_profile_*.html
+concept-flow.html
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Hermes
+.hermes/
+hermes_*.json
