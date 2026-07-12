@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>链式AI条件单</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background: #0d1117; color: #c9d1d9; min-height: 100vh; padding: 20px; }
+
+.header { margin-bottom: 16px; }
+.header h1 { font-size: 20px; color: #f0f6fc; }
+
+.tab-bar { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 1px solid #30363d; }
+.tab-btn {
+  padding: 8px 18px; font-size: 13px; cursor: pointer; border: none;
+  background: transparent; color: #8b949e; border-bottom: 2px solid transparent;
+  transition: .15s;
+}
+.tab-btn:hover { color: #c9d1d9; }
+.tab-btn.active { color: #f0f6fc; border-bottom-color: #58a6ff; font-weight: 500; }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.restrictions-bar {
+  background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+  padding: 10px 16px; margin-bottom: 16px; font-size: 12px;
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+}
+.restrictions-bar .tag {
+  background: #0d1117; border: 1px solid #30363d; border-radius: 4px;
+  padding: 2px 8px; color: #8b949e;
+}
+.restrictions-bar .tag strong { color: #58a6ff; }
+
+.controls-bar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+.btn {
+  padding: 6px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid #30363d;
+  background: #21262d; color: #c9d1d9; height: 32px; display: inline-flex; align-items: center; gap: 4px;
+}
+.btn:hover { border-color: #58a6ff; }
+.btn-primary { background: #238636; border-color: rgba(240,246,252,0.1); color: #fff; }
+.btn-primary:hover { background: #2ea043; }
+.btn-danger { background: #da3633; border-color: rgba(240,246,252,0.1); color: #fff; }
+.btn-danger:hover { background: #f85149; }
+.btn-warning { background: #9e6a03; border: 1px solid #bb8009; color: #fff; }
+.btn-warning:hover { background: #845502; }
+.btn-sm { padding: 2px 10px; font-size: 11px; height: auto; }
+.btn-analyze { background: #1f6feb; border-color: rgba(240,246,252,0.1); color: #fff; }
+.btn-analyze:hover { background: #388bfd; }
+
+.presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.preset-btn {
+  padding: 3px 10px; font-size: 11px; border-radius: 12px; cursor: pointer;
+  border: 1px solid #30363d; background: transparent; color: #8b949e;
+}
+.preset-btn:hover { border-color: #58a6ff; color: #c9d1d9; }
+
+.entries { display: flex; flex-direction: column; gap: 10px; }
+.entry-card {
+  background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+  padding: 14px 16px; position: relative;
+}
+.entry-card .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.entry-card .field { display: flex; flex-direction: column; gap: 3px; }
+.entry-card .field label { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.3px; }
+.entry-card .field input, .entry-card .field select, .entry-card .field textarea {
+  background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+  color: #c9d1d9; padding: 5px 8px; font-size: 13px;
+}
+.entry-card .field input:focus, .entry-card .field select:focus { outline: none; border-color: #58a6ff; }
+.entry-card .field textarea { font-size: 12px; resize: vertical; min-height: 48px; width: 100%; }
+.entry-card .idx { font-size: 11px; color: #484f58; margin-bottom: 6px; }
+.entry-card .del-btn {
+  position: absolute; top: 10px; right: 10px; cursor: pointer;
+  font-size: 16px; color: #484f58; background: none; border: none;
+}
+.entry-card .del-btn:hover { color: #f85149; }
+
+.stock-search-wrapper { position: relative; }
+.stock-search-dropdown {
+  display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 200;
+  background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+  max-height: 240px; overflow-y: auto; margin-top: 2px;
+}
+.stock-search-dropdown.open { display: block; }
+.stock-search-item { padding: 4px 8px; cursor: pointer; font-size: 12px; display: flex; justify-content: space-between; }
+.stock-search-item:hover { background: #1c2128; color: #58a6ff; }
+.stock-search-item .sym { color: #58a6ff; }
+
+.result-bar { margin-top: 12px; padding: 10px 16px; border-radius: 8px; font-size: 13px; display: none; }
+.result-bar.success { display: block; background: #002d1a; border: 1px solid #238636; color: #7ee787; }
+.result-bar.error { display: block; background: #3d0000; border: 1px solid #da3633; color: #ff7b72; }
+.result-bar .detail { font-size: 11px; color: #8b949e; margin-top: 4px; }
+
+/* 表格 */
+.cond-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.cond-table th {
+  background: #21262d; color: #8b949e; font-weight: 500;
+  text-align: left; padding: 8px 10px; border-bottom: 1px solid #30363d;
+  font-size: 11px; position: sticky; top: 0; z-index: 10;
+}
+.cond-table td { padding: 7px 10px; border-bottom: 1px solid #21262d; }
+.cond-table tr:hover td { background: #1c2128; }
+.cond-table .code { color: #58a6ff; font-weight: 500; }
+.cond-table .buy { color: #3fb950; }
+.cond-table .sell { color: #f85149; }
+.cond-table .active { color: #58a6ff; }
+.cond-table .triggered { color: #d29922; }
+.cond-table .cancelled { color: #484f58; }
+.cond-table .expired { color: #484f58; }
+
+.loading { text-align: center; padding: 30px; color: #8b949e; }
+.empty { text-align: center; padding: 30px; color: #484f58; font-size: 13px; }
+
+/* Tab2 toolbar */
+.tab2-toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📋 链式AI条件单</h1>
+</div>
+
+<div class="restrictions-bar" id="restrictionsBar">⏳ 加载中...</div>
+
+<div class="tab-bar" id="tabBar">
+  <button class="tab-btn active" data-tab="tab1">✏️ 新增链式交易</button>
+  <button class="tab-btn" data-tab="tab2">🔄 活跃链式交易</button>
+  <button class="tab-btn" data-tab="tab3">📜 历史链式交易</button>
+</div>
+
+<!-- Tab 1: 新增 -->
+<div class="tab-panel active" id="tab1">
+  <div class="presets" id="presets"></div>
+  <div class="controls-bar">
+    <button class="btn" onclick="addEntry()">＋ 添加一行</button>
+    <button class="btn btn-primary" onclick="submitAll()">🚀 批量提交</button>
+    <button class="btn btn-danger" onclick="clearAll()">🗑 清空</button>
+  </div>
+  <div class="entries" id="entries"></div>
+  <div id="resultBar1" class="result-bar"></div>
+</div>
+
+<!-- Tab 2: 活跃 -->
+<div class="tab-panel" id="tab2">
+  <div class="tab2-toolbar">
+    <button class="btn" onclick="loadActive()">🔄 刷新</button>
+    <span style="font-size:12px;color:#8b949e" id="activeCount"></span>
+  </div>
+  <div id="activeContent"><div class="loading">加载中...</div></div>
+</div>
+
+<!-- Tab 3: 历史 -->
+<div class="tab-panel" id="tab3">
+  <div class="tab2-toolbar">
+    <button class="btn" onclick="loadHistory()">🔄 刷新</button>
+    <button class="btn" onclick="toggleAllChains()">🔽 全部展开</button>
+    <span style="font-size:12px;color:#8b949e" id="historyCount"></span>
+  </div>
+  <div id="historyContent"><div class="loading">加载中...</div></div>
+</div>
+
+<script>
+// ── Tab切换 ──
+document.getElementById('tabBar').addEventListener('click', e => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(btn.dataset.tab).classList.add('active');
+  if (btn.dataset.tab === 'tab2') loadActive();
+  if (btn.dataset.tab === 'tab3') loadHistory();
+});
+
+// ── State ──
+let allStocks = [], entryCount = 0;
+const PRESETS = [
+  { label: '清仓出货', stocks: [
+    {code:'300059',name:'东方财富',strategy:'price_trigger',side:'sell',trigger:'gte',trigger_price:21.20,shares:500,note:'[策略] 持仓2000股@20.51止盈'},
+    {code:'601138',name:'工业富联',strategy:'price_trigger',side:'sell',trigger:'gte',trigger_price:65.50,shares:100,note:'[策略] 持仓284股@65.32止盈'},
+    {code:'002345',name:'潮宏基',strategy:'price_trigger',side:'sell',trigger:'gte',trigger_price:11.00,shares:2000,note:'[策略] 持仓9000@10.50止盈'},
+  ]},
+  { label: '新建仓位', stocks: [
+    {code:'600030',name:'中信证券',strategy:'price_trigger',side:'buy',trigger:'gte',trigger_price:29.00,shares:1500,note:'[策略] 新标的建仓'},
+    {code:'000651',name:'格力电器',strategy:'price_trigger',side:'buy',trigger:'lte',trigger_price:37.00,shares:1000,note:'[策略] 价值股低吸'},
+  ]},
+  { label: '做T测试', stocks: [
+    {code:'300059',name:'东方财富',strategy:'t_trade',side:'sell',t_type:'buy_first',t_spread:1.0,shares:500,note:'[策略] 做T测试'},
+  ]},
+  { label: '300059跟踪', stocks: [
+    {code:'300059',name:'东方财富',strategy:'price_trigger',side:'sell',trigger:'gte',trigger_price:21.50,shares:500,note:'[策略] 继续止盈'},
+    {code:'300059',name:'东方财富',strategy:'price_trigger',side:'buy',trigger:'lte',trigger_price:20.00,shares:500,note:'[策略] 回踩加仓'},
+  ]},
+];
+
+// ── Tab1: 新增 ──
+function addEntry(prefill) {
+  entryCount++; const id = entryCount; const container = document.getElementById('entries');
+  const div = document.createElement('div'); div.className = 'entry-card'; div.id = `entry-${id}`;
+  const p = prefill || {}; const today = new Date().toISOString().split('T')[0];
+  const stype = p.strategy || 'price_trigger';
+  const sideVal = p.side || 'buy';
+  const trigVal = p.trigger || 'gte';
+  div.innerHTML = `
+    <button class="del-btn" onclick="removeEntry(${id})">✕</button>
+    <div class="idx">#${id}</div>
+    <div class="row">
+      <div class="field" style="flex:0 0 140px">
+        <label>股票代码</label>
+        <div class="stock-search-wrapper" style="width:140px">
+          <input type="text" id="code-${id}" value="${p.code||''}" placeholder="300059" style="width:140px"
+                 oninput="onCodeInput(${id})" onfocus="onCodeFocus(${id})" onkeydown="onCodeKey(${id},event)">
+          <div class="stock-search-dropdown" id="drop-${id}"></div>
+        </div>
+      </div>
+      <div class="field" style="flex:0 0 120px">
+        <label>股票名称</label><input type="text" id="name-${id}" value="${p.name||''}" placeholder="东方财富" style="width:120px">
+      </div>
+      <div class="field">
+        <label>策略类型</label>
+        <select id="strategy-${id}" style="width:110px" onchange="showStrategyParams(${id})">
+          <option value="price_trigger" ${stype==='price_trigger'?'selected':''}>📊 定价触发</option>
+          <option value="bounce_buy" ${stype==='bounce_buy'?'selected':''}>📈 反弹买入</option>
+          <option value="pullback_sell" ${stype==='pullback_sell'?'selected':''}>📉 回落卖出</option>
+          <option value="opened_sell" ${stype==='opened_sell'?'selected':''}>🔓 开板卖出</option>
+          <option value="grid" ${stype==='grid'?'selected':''}>🔲 网格交易</option>
+          <option value="time_trigger" ${stype==='time_trigger'?'selected':''}>⏰ 时间触发</option>
+          <option value="t_trade" ${stype==='t_trade'?'selected':''}>🔄 做T</option>
+          <option value="breakeven_sell" ${stype==='breakeven_sell'?'selected':''}>💸 回本卖出</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>方向</label>
+        <select id="side-${id}">
+          <option value="buy" ${sideVal==='buy'?'selected':''}>买入</option>
+          <option value="sell" ${sideVal==='sell'?'selected':''}>卖出</option>
+        </select>
+      </div>
+      <div class="field" id="trigField-${id}" style="display:${stype==='price_trigger'?'':'none'}">
+        <label>触发条件</label>
+        <select id="trigger-${id}">
+          <option value="gte" ${trigVal==='gte'?'selected':''}>≥ (达到/超过)</option>
+          <option value="lte" ${trigVal==='lte'?'selected':''}>≤ (跌到/低于)</option>
+        </select>
+      </div>
+      <div class="field" id="priceField-${id}" style="display:${['price_trigger','time_trigger'].includes(stype)?'':'none'}">
+        <label>触发价格</label>
+        <input type="number" id="trigger_price-${id}" value="${p.trigger_price||''}" step="0.01" min="0" style="width:80px" placeholder="0.00">
+      </div>
+      <div class="field" id="monPriceField-${id}" style="display:none">
+        <label>监控价格</label>
+        <input type="number" id="monitor_price-${id}" value="${p.monitor_price||''}" step="0.01" min="0" style="width:80px">
+      </div>
+      <div class="field" id="reboundField-${id}" style="display:none">
+        <label>反弹%</label>
+        <input type="number" id="rebound_pct-${id}" value="${p.rebound_pct||2}" step="0.5" min="0" style="width:60px">
+      </div>
+      <div class="field" id="pullbackField-${id}" style="display:none">
+        <label>回落%</label>
+        <input type="number" id="pullback_pct-${id}" value="${p.pullback_pct||3}" step="0.5" min="0" style="width:60px">
+      </div>
+      <div class="field" id="fallbackField-${id}" style="display:none">
+        <label>开板回落%</label>
+        <input type="number" id="fallback_pct-${id}" value="${p.fallback_pct||3}" step="0.5" min="0" style="width:60px">
+      </div>
+      <div class="field" id="gridLowField-${id}" style="display:none">
+        <label>网格下限</label>
+        <input type="number" id="grid_low-${id}" value="${p.grid_low||''}" step="0.01" style="width:70px">
+      </div>
+      <div class="field" id="gridHighField-${id}" style="display:none">
+        <label>网格上限</label>
+        <input type="number" id="grid_high-${id}" value="${p.grid_high||''}" step="0.01" style="width:70px">
+      </div>
+      <div class="field" id="gridStepField-${id}" style="display:none">
+        <label>网格步长%</label>
+        <input type="number" id="grid_step-${id}" value="${p.grid_step||2}" step="0.5" style="width:55px">
+      </div>
+      <div class="field" id="gridMaxField-${id}" style="display:none">
+        <label>最大持仓</label>
+        <input type="number" id="grid_max_shares-${id}" value="${p.grid_max_shares||0}" step="100" style="width:70px">
+      </div>
+      <div class="field" id="timeField-${id}" style="display:none">
+        <label>触发时间</label>
+        <input type="time" id="trigger_time-${id}" value="${p.trigger_time||'14:55'}" style="width:80px">
+      </div>
+      <div class="field" id="tTypeField-${id}" style="display:none">
+        <label>做T方式</label>
+        <select id="t_type-${id}">
+          <option value="buy_first">先买后卖</option>
+          <option value="sell_first">先卖后买</option>
+        </select>
+      </div>
+      <div class="field" id="tSpreadField-${id}" style="display:none">
+        <label>T差%</label>
+        <input type="number" id="t_spread-${id}" value="${p.t_spread||1}" step="0.1" min="0" style="width:55px">
+      </div>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <div class="field" style="flex:1">
+        <label>股数</label>
+        <input type="number" id="shares-${id}" value="${p.shares||100}" step="100" min="100" style="width:80px">
+      </div>
+      <div class="field">
+        <label>清仓日期</label>
+        <input type="date" id="valid-${id}" value="${p.valid_until||today}" style="width:110px">
+      </div>
+      <div class="field">
+        <label>仓位上限</label>
+        <select id="maxpp-${id}" style="width:65px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:5px 4px;font-size:12px">
+          ${[10,15,20,25,30,35,40,50,60,80,100].map(v => `<option value="${v}" ${v==30?'selected':''}>${v}%</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px;padding-top:8px;border-top:1px solid #30363d">
+      <span style="font-size:10px;color:#484f58;width:100%;margin-bottom:4px">📋 交易限制（可逐条修改，不填则用系统默认）</span>
+    </div>
+    <div class="row" style="gap:8px">
+      <div class="field">
+        <label>分批建仓</label>
+        <select id="batchBuy-${id}" style="width:80px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:4px;font-size:11px">
+          <option value="allow" ${p.allow_batch_buy!==false?'selected':''}>允许</option>
+          <option value="deny" ${p.allow_batch_buy===false?'selected':''}>禁止</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>分批次数</label>
+        <input type="number" id="batchCount-${id}" value="${p.batch_max_count||3}" min="1" max="10" style="width:55px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;padding:4px;font-size:12px">
+      </div>
+      <div class="field">
+        <label>分批卖出</label>
+        <select id="batchSell-${id}" style="width:80px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:4px;font-size:11px">
+          <option value="allow" ${p.allow_batch_sell!==false?'selected':''}>允许</option>
+          <option value="deny" ${p.allow_batch_sell===false?'selected':''}>禁止</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>价偏离%</label>
+        <input type="number" id="slippage-${id}" value="${p.price_slippage_pct||0.5}" step="0.1" min="0" max="5" style="width:55px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;padding:4px;font-size:12px">
+      </div>
+      <div class="field">
+        <label>默认止损%</label>
+        <input type="number" id="stopLoss-${id}" value="${p.stop_loss_default_pct||8}" step="1" min="0" max="30" style="width:55px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;padding:4px;font-size:12px">
+      </div>
+      <div class="field">
+        <label>交易单位</label>
+        <select id="roundLot-${id}" style="width:80px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:4px;font-size:11px">
+          <option value="100" ${p.round_lot==100||!p.round_lot?'selected':''}>100股/手</option>
+          <option value="200" ${p.round_lot==200?'selected':''}>200股/手</option>
+          <option value="500" ${p.round_lot==500?'selected':''}>500股/手</option>
+          <option value="1000" ${p.round_lot==1000?'selected':''}>1000股/手</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>留底资金%</label>
+        <input type="number" id="cashReserve-${id}" value="${p.min_cash_reserve_pct||5}" step="1" min="0" max="50" style="width:55px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;padding:4px;font-size:12px">
+      </div>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <div class="field" style="flex:1">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+          <span style="font-size:10px;color:#d29922">⚠️</span>
+          <span style="font-size:11px;color:#d29922">策略提示词优先级高于系统限制</span>
+        </div>
+        <label>策略提示词（AI决策参考）</label>
+        <textarea id="note-${id}" rows="2">${p.note||'[策略] '}</textarea>
+      </div>
+    </div>`;
+  container.appendChild(div);
+  showStrategyParams(id); // init visibility
+}
+function removeEntry(id) { const el = document.getElementById(`entry-${id}`); if (el) el.remove(); }
+function clearAll() { document.getElementById('entries').innerHTML = ''; entryCount = 0; }
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === name));
+}
+
+// ── 策略参数联动 ──
+function showStrategyParams(id) {
+  const s = document.getElementById(`strategy-${id}`).value;
+  // 先全部隐藏
+  ['trigField','priceField','monPriceField','reboundField','pullbackField','fallbackField',
+   'gridLowField','gridHighField','gridStepField','gridMaxField','timeField','tTypeField','tSpreadField'].forEach(f => {
+    const el = document.getElementById(`${f}-${id}`);
+    if (el) el.style.display = 'none';
+  });
+  // 根据策略显示对应字段
+  const map = {
+    price_trigger: ['trigField','priceField'],
+    bounce_buy: ['monPriceField','reboundField'],
+    pullback_sell: ['monPriceField','pullbackField'],
+    opened_sell: ['fallbackField'],
+    grid: ['gridLowField','gridHighField','gridStepField','gridMaxField'],
+    time_trigger: ['timeField','priceField'],
+    t_trade: ['tTypeField','tSpreadField','sharesField'],
+    breakeven_sell: [],
+  };
+  (map[s]||[]).forEach(f => {
+    const el = document.getElementById(`${f}-${id}`);
+    if (el) el.style.display = '';
+  });
+}
+
+// ── 股票搜索 ──
+let searchTimeouts = {};
+function onCodeInput(id) { clearTimeout(searchTimeouts[id]); searchTimeouts[id] = setTimeout(() => doStockSearch(id), 200); }
+function onCodeFocus(id) { const v = document.getElementById(`code-${id}`).value; if (v) doStockSearch(id); }
+function onCodeKey(id, e) {
+  const drop = document.getElementById(`drop-${id}`);
+  if (e.key === 'ArrowDown') { e.preventDefault(); drop.querySelector('.stock-search-item')?.focus(); }
+  else if (e.key === 'Escape') drop.classList.remove('open');
+}
+function doStockSearch(id) {
+  const q = document.getElementById(`code-${id}`).value.toLowerCase();
+  const drop = document.getElementById(`drop-${id}`);
+  if (!q || !allStocks.length) { drop.classList.remove('open'); return; }
+  let e = [], cm = [], nm = [];
+  allStocks.forEach(s => {
+    if (s.symbol === q) e.push(s); else if (s.symbol.includes(q)) cm.push(s);
+    else if (s.name.toLowerCase().includes(q)) nm.push(s);
+  });
+  const r = [...e, ...cm, ...nm].slice(0, 30);
+  if (!r.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = r.map(s => `<div class="stock-search-item" onclick="selectStock(${id},'${s.symbol}','${s.name.replace(/'/g,"\\'")}')">
+    <span><span class="sym">${s.symbol}</span> ${s.name}</span></div>`).join('');
+  drop.classList.add('open');
+}
+function selectStock(id, code, name) {
+  document.getElementById(`code-${id}`).value = code; document.getElementById(`name-${id}`).value = name;
+  document.getElementById(`drop-${id}`).classList.remove('open');
+}
+document.addEventListener('click', e => { if (!e.target.closest('.stock-search-wrapper')) document.querySelectorAll('.stock-search-dropdown').forEach(d => d.classList.remove('open')); });
+
+// ── 批量提交 ──
+async function submitAll() {
+  const cards = document.querySelectorAll('#tab1 .entry-card');
+  if (!cards.length) { showResult('error', '没有条件单'); return; }
+  let conds = [], errors = [];
+  cards.forEach(c => {
+    const id = c.id.split('-')[1];
+    const code = document.getElementById(`code-${id}`).value.trim();
+    const name = document.getElementById(`name-${id}`).value.trim() || `股票${code}`;
+    const side = document.getElementById(`side-${id}`).value;
+    const strategy = document.getElementById(`strategy-${id}`).value;
+    const shares = parseInt(document.getElementById(`shares-${id}`).value) || 100;
+    const valid_until = document.getElementById(`valid-${id}`).value;
+    const maxpp = parseInt(document.getElementById(`maxpp-${id}`).value) || 30;
+    const batchBuy = document.getElementById(`batchBuy-${id}`).value;
+    const batchCount = parseInt(document.getElementById(`batchCount-${id}`).value) || 3;
+    const batchSell = document.getElementById(`batchSell-${id}`).value;
+    const slippage = parseFloat(document.getElementById(`slippage-${id}`).value) || 0.5;
+    const stopLoss = parseInt(document.getElementById(`stopLoss-${id}`).value) || 8;
+    const roundLot = parseInt(document.getElementById(`roundLot-${id}`).value) || 100;
+    const cashReserve = parseInt(document.getElementById(`cashReserve-${id}`).value) || 5;
+    const note = document.getElementById(`note-${id}`).value.trim();
+    
+    if (!code) { errors.push(`#${id}: 缺代码`); return; }
+    
+    // 构建策略参数
+    let params = { side, shares };
+    if (strategy === 'price_trigger') {
+      params.trigger = document.getElementById(`trigger-${id}`).value;
+      params.trigger_price = parseFloat(document.getElementById(`trigger_price-${id}`).value);
+      if (!params.trigger_price || params.trigger_price <= 0) { errors.push(`#${id}: 触发价无效`); return; }
+    } else if (strategy === 'bounce_buy') {
+      params.trigger = 'lte'; params.monitor_price = parseFloat(document.getElementById(`monitor_price-${id}`).value) || 0;
+      params.rebound_pct = parseFloat(document.getElementById(`rebound_pct-${id}`).value) || 2;
+    } else if (strategy === 'pullback_sell') {
+      params.trigger = 'gte'; params.monitor_price = parseFloat(document.getElementById(`monitor_price-${id}`).value) || 0;
+      params.pullback_pct = parseFloat(document.getElementById(`pullback_pct-${id}`).value) || 3;
+    } else if (strategy === 'opened_sell') {
+      params.trigger = 'gte'; params.fallback_pct = parseFloat(document.getElementById(`fallback_pct-${id}`).value) || 3;
+    } else if (strategy === 'grid') {
+      params.grid_low = parseFloat(document.getElementById(`grid_low-${id}`).value) || 0;
+      params.grid_high = parseFloat(document.getElementById(`grid_high-${id}`).value) || 0;
+      params.grid_step = parseFloat(document.getElementById(`grid_step-${id}`).value) || 2;
+      params.grid_max_shares = parseInt(document.getElementById(`grid_max_shares-${id}`).value) || 0;
+    } else if (strategy === 'time_trigger') {
+      params.trigger_time = document.getElementById(`trigger_time-${id}`).value;
+      params.trigger_price = parseFloat(document.getElementById(`trigger_price-${id}`).value) || 0;
+    } else if (strategy === 't_trade') {
+      params.t_type = document.getElementById(`t_type-${id}`).value;
+      params.t_spread = parseFloat(document.getElementById(`t_spread-${id}`).value) || 1;
+    } // breakeven_sell has no extra params
+    
+    const ctype = 'call_ai_' + strategy;
+    const cid = `ai-${code}-${Date.now()}-${Math.floor(Math.random()*100)}`;
+    conds.push({ id: cid, type: ctype, code, name, ...params,
+      valid_until: valid_until || undefined, note, max_position_pct: maxpp,
+      allow_batch: batchBuy==='allow', batch_max_count: batchCount,
+      allow_batch_sell: batchSell==='allow',
+      price_slippage_pct: slippage, stop_loss_default_pct: stopLoss,
+      round_lot: roundLot, min_cash_reserve_pct: cashReserve });
+  });
+  if (!conds.length) { showResult('error', errors.join('<br>')); return; }
+  let ok = 0, fail = 0, details = [];
+  for (const c of conds) {
+    try {
+      const r = await fetch('/daemon/conditions', { method: 'POST',
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify(c) });
+      const d = await r.json();
+      if (d.status === 'ok') { ok++; details.push(`✅ ${c.code} ${c.side} @${c.trigger_price}`); }
+      else { fail++; details.push(`❌ ${c.code}: ${d.error||'失败'}`); }
+    } catch(e) { fail++; details.push(`❌ ${c.code}: 网络错误`); }
+  }
+  const msg = fail ? (ok ? `⚠️ ${ok}条成功, ${fail}条失败` : `❌ ${fail}条全部失败`) : `✅ ${ok}条全部递交成功`;
+  showResult(fail? (ok?'success':'error') : 'success', msg + '<div class="detail">' + details.join('<br>') + '</div>');
+  if (ok > 0) {
+    setTimeout(() => { clearAll(); switchTab('tab2'); loadActive(); }, 1500);
+  }
+}
+function showResult(type, msg) {
+  const bar = document.getElementById('resultBar1');
+  bar.className = `result-bar ${type}`; bar.innerHTML = msg;
+}
+
+// ── Tab2: 活跃（持仓未清的链式条件）──
+async function loadActive() {
+  const el = document.getElementById('activeContent');
+  el.innerHTML = '<div class="loading">加载中...</div>';
+  try {
+    const [r, s, t] = await Promise.all([
+      fetch('/daemon/conditions').then(r=>r.json()),
+      fetch('/daemon/status').then(r=>r.json()),
+      fetch('/daemon/trades').then(r=>r.json())
+    ]);
+    // 当前持仓代码集
+    const held = new Set((s.positions||[]).map(p => p.code));
+    const all = (r.conditions||[]).filter(c => c.type?.startsWith('call_ai_') || c.id?.startsWith('ai-'));
+    const act = all.filter(c => held.has(c.code));
+    document.getElementById('activeCount').textContent = `共${act.length}条`;
+    if (!act.length) { el.innerHTML = '<div class="empty">暂无活跃链式条件</div>'; return; }
+
+    // 构建持仓映射
+    const posMap = {};
+    (s.positions||[]).forEach(p => { posMap[p.code] = p; });
+
+    // 按标的合并
+    const groups = {};
+    act.forEach(c => {
+      const code = c.code;
+      if (!groups[code]) groups[code] = { code, name: c.name||'', conditions: [], pos: posMap[code]||{} };
+      groups[code].conditions.push(c);
+    });
+
+    // 生成合并提示词
+    function makeMergedNote(code, pos, conds) {
+      const shares = pos.shares||0;
+      const cost = pos.avg_cost||0;
+      let parts = [`${shares}股`];
+      if (cost) parts.push(`@¥${cost.toFixed(2)}`);
+
+      // 汇总条件方向
+      const buys = conds.filter(c => c.side === 'buy');
+      const sells = conds.filter(c => c.side === 'sell');
+      if (sells.length) {
+        sells.forEach(c => {
+          const p2 = typeof c.params === 'string' ? (JSON.parse(c.params)||{}) : (c.params||{});
+          const tp = p2.trigger_price||'?';
+          const trigDesc = c.type.includes('lte')||p2.trigger==='lte'?'止损':'止盈';
+          parts.push(`${trigDesc}${tp}`);
+        });
+      }
+      if (buys.length) {
+        buys.forEach(c => {
+          const p2 = typeof c.params === 'string' ? (JSON.parse(c.params)||{}) : (c.params||{});
+          parts.push(`补仓${p2.trigger_price||'?'}`);
+        });
+      }
+      return parts.join(' ');
+    }
+
+    // 计算已实现盈亏（按股票，从trades的profit汇总）
+    const tradesList = Array.isArray(t) ? t : (t.trades||[]);
+    const realizedPnl = {};
+    tradesList.forEach(trade => {
+      const code = trade.code;
+      const profit = trade.profit;
+      if (code && profit !== null && profit !== undefined && trade.side?.startsWith('SELL')) {
+        realizedPnl[code] = (realizedPnl[code]||0) + profit;
+      }
+    });
+
+    el.innerHTML = Object.values(groups).map(g => {
+      const pos = g.pos;
+      const shares = pos.shares||0;
+      const cost = pos.avg_cost||0;
+      const mv = pos.market_value||0;
+      // 当前浮盈 = 市值 - 成本×股数
+      const holdCost = cost * shares;
+      const floatPnl = mv - holdCost;
+      const floatPct = holdCost > 0 ? (floatPnl / holdCost * 100) : 0;
+      const realized = realizedPnl[g.code] || 0;
+      const mergedNote = makeMergedNote(g.code, pos, g.conditions);
+
+      const pnlColor = floatPnl >= 0 ? '#3fb950' : '#f85149';
+      const realizedColor = realized >= 0 ? '#3fb950' : '#f85149';
+
+      // 取要分析的条件（优先有链ID的，否则用第一条）
+      const analyzeCid = (g.conditions.find(c => c.internal_state?._chain_id) || g.conditions[0])?.id || '';
+      // 所有条件ID列表（用于批量操作）
+      const allCids = g.conditions.map(c => c.id);
+
+      return `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;margin-bottom:12px;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#1c2128;border-bottom:1px solid #30363d">
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <span style="color:#58a6ff;font-weight:600;font-size:14px">${g.code}</span>
+            <span style="color:#c9d1d9;font-size:14px;font-weight:500">${g.name||''}</span>
+            <span style="font-size:12px;color:#8b949e">持仓 <strong style="color:#f0f6fc">${shares}</strong>股</span>
+            ${cost ? `<span style="font-size:12px;color:#8b949e">持仓成本 <strong style="color:#f0f6fc">¥${cost.toFixed(2)}</strong></span>` : ''}
+            <span style="font-size:12px;color:#8b949e">当前浮盈 <strong style="color:${pnlColor}">¥${floatPnl >= 0 ? '+' : ''}${floatPnl.toFixed(0)} (${floatPct >= 0 ? '+' : ''}${floatPct.toFixed(1)}%)</strong></span>
+            <span style="font-size:12px;color:#8b949e">已实现盈亏 <strong style="color:${realizedColor}">¥${realized >= 0 ? '+' : ''}${realized.toFixed(0)}</strong></span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+            <span style="font-size:12px;color:#d29922;margin-right:4px">${mergedNote}</span>
+            <button class="btn btn-sm btn-analyze" onclick="analyzeCond('${analyzeCid}')">🔍 分析链</button>
+            <button class="btn btn-sm btn-warning" onclick="batchManual('${g.code}')">🟡 手动</button>
+            <button class="btn btn-sm btn-danger" onclick="batchCancel('${g.code}')">🔴 取消全部</button>
+          </div>
+        </div>
+        <table class="cond-table"><thead><tr>
+          <th>策略</th><th>方向</th><th>触发价</th><th>股数</th><th>清仓日</th><th>状态</th><th>提示词</th>
+        </tr></thead><tbody>${
+          g.conditions.map(c => {
+            const p = typeof c.params === 'string' ? (JSON.parse(c.params)||{}) : (c.params||{});
+            const stName = {price_trigger:'定价',bounce_buy:'反弹',pullback_sell:'回落',opened_sell:'开板',grid:'网格',time_trigger:'定时',t_trade:'做T',breakeven_sell:'回本'}[c.type.replace('call_ai_','')]||c.type.replace('call_ai_','');
+            return `<tr data-chain-id="${c.internal_state?._chain_id||c.id||''}" data-origin="${((c.internal_state?._origin_note||c.note)||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}" data-code="${c.code}" data-type="${c.type}" data-side="${c.side}" data-shares="${c.shares||0}">
+              <td style="font-size:11px">${stName}</td>
+              <td class="${c.side}" style="font-size:12px">${c.side==='buy'?'买入':'卖出'}</td>
+              <td style="font-size:12px">${p.trigger_price||p.monitor_price||p.grid_low||''}</td>
+              <td style="font-size:12px">${c.shares||0}</td>
+              <td style="font-size:11px;color:#8b949e">${c.valid_until||'—'}</td>
+              <td><span class="tag" style="font-size:10px">${c.internal_state?._chain_id?'🔗 AI链':'⏳ 等待'}</span>${c.internal_state?._chain_id ? `<span class="ai-decision-link" onclick="showAiDecision('${c.internal_state._chain_id}')" title="查看AI决策详情" style="font-size:13px;cursor:pointer;margin-left:3px">📋</span>` : ''}</td>
+              <td style="font-size:11px;color:#8b949e;word-break:break-all;cursor:pointer;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" ondblclick="showFullNote(this,'${(c.note||'—').replace(/'/g,"\\'").replace(/"/g,'&quot;')}')">${(c.note||'—').slice(0,40)}</td>
+            </tr>`;
+          }).join('')
+        }</tbody></table>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = `<div class="empty">❌ ${e.message}</div>`; }
+}
+
+async function analyzeCond(cid) {
+  showToast('⏳ 正在呼叫AI分析，请等待（因数据查询可能需10-25秒）...', 45000);
+  try {
+    const r = await fetch(`/daemon/conditions/${cid}/analyze`, { method: 'POST' });
+    const d = await r.json();
+    if (d.status === 'ok') {
+      const resp = d.ai_response || '';
+      const analysis = resp.match(/"analysis"\s*:\s*"([^"]+)"/);
+      const action = resp.match(/"action"\s*:\s*"([^"]+)"/);
+      const result = analysis ? analysis[1].slice(0, 80)+'...' : '无分析摘要';
+      const act = action ? action[1] : '?';
+      showToast(`✅ AI分析完成 | 决定:${act} | ${result}`, 8000);
+      loadActive();
+    } else {
+      showToast('❌ AI分析失败: ' + (d.error||''), 6000);
+    }
+  } catch(e) { showToast('❌ 网络错误: ' + e.message, 5000); }
+}
+
+// ── 批量操作（卡片表头按钮）──
+async function batchManual(code) {
+  if (!confirm(`将 ${code} 的所有AI条件转为手动？触发后直接交易，不再呼叫AI。`)) return;
+  const r = await fetch('/daemon/conditions'); const d = await r.json();
+  const conds = (d.conditions||[]).filter(c => c.code === code && c.status === 'active');
+  for (const c of conds) {
+    await fetch(`/daemon/conditions/${c.id}/manual`, { method: 'POST' });
+  }
+  showToast(`🟡 ${code} ${conds.length}条已转为手动`, 3000);
+  loadActive();
+}
+
+async function batchCancel(code) {
+  const r = await fetch('/daemon/conditions'); const d = await r.json();
+  const conds = (d.conditions||[]).filter(c => c.code === code && c.status === 'active');
+  if (!confirm(`取消 ${code} 的全部${conds.length}条活跃条件？不可恢复。`)) return;
+  for (const c of conds) {
+    await fetch(`/daemon/conditions/${c.id}`, { method: 'DELETE' });
+  }
+  showToast(`🔴 ${code} ${conds.length}条已取消`, 3000);
+  loadActive();
+}
+
+async function cancelCond(cid) {
+  if (!confirm('彻底取消条件单 ' + cid.slice(0,30) + '?')) return;
+  await fetch(`/daemon/conditions/${cid}`, { method: 'DELETE' });
+  loadActive();
+  loadRestrictions();
+}
+
+async function manualCond(cid) {
+  if (!confirm('AI退出，该条件转为手动触发不再次呼叫AI？')) return;
+  try {
+    const r = await fetch(`/daemon/conditions/${cid}/manual`, { method: 'POST' });
+    const d = await r.json();
+    if (d.status === 'ok') showToast(d.message);
+    else showToast('❌ ' + (d.error||''));
+  } catch(e) { showToast('❌ 网络错误'); }
+  loadActive();
+}
+
+// ── Tab3: 历史（按链分组 + 时间排序）──
+async function loadHistory() {
+  const el = document.getElementById('historyContent');
+  el.innerHTML = '<div class="loading">加载中...</div>';
+  try {
+    const [r, s] = await Promise.all([
+      fetch('/daemon/conditions').then(r=>r.json()),
+      fetch('/daemon/status').then(r=>r.json())
+    ]);
+    const held = new Set((s.positions||[]).map(p => p.code));
+    const all = (r.conditions||[]).filter(c => c.type?.startsWith('call_ai_') || c.id?.startsWith('ai-'));
+    // 历史 = 持仓已清（代码不在当前持仓中）
+    const closedCodes = new Set([...new Set(all.map(c=>c.code))].filter(code => !held.has(code)));
+    const hist = all.filter(c => closedCodes.has(c.code));
+    document.getElementById('historyCount').textContent = `共${hist.length}条`;
+
+    // 按链分组：每笔尝试从internal_state取链ID，无链ID的归入"独立条件"
+    const chains = {};
+    all.forEach(c => {
+      const istate = c.internal_state || {};
+      const cid = istate._chain_id || c.id;
+      if (!chains[cid]) chains[cid] = { chain_id: cid, items: [], origin_note: '', first_time: '', last_time: '', codes: new Set() };
+      chains[cid].items.push(c);
+      chains[cid].codes.add(c.code);
+      const tm = c.triggered_at || c.created || '';
+      if (tm && (!chains[cid].first_time || tm < chains[cid].first_time)) chains[cid].first_time = tm;
+      if (tm && (!chains[cid].last_time || tm > chains[cid].last_time)) chains[cid].last_time = tm;
+      // 尝试取原始策略note
+      const onote = istate._origin_note || '';
+      if (onote && !chains[cid].origin_note) chains[cid].origin_note = onote;
+    });
+    // 无origin_note的用第一条的note
+    Object.values(chains).forEach(ch => { if (!ch.origin_note && ch.items.length) ch.origin_note = ch.items[0].note || ''; });
+
+    // 按最后触发时间倒序
+    const sortedChains = Object.values(chains).sort((a, b) => (b.last_time || '') > (a.last_time || '') ? 1 : -1);
+    // 截取前20条链
+    const displayChains = sortedChains.slice(0, 20);
+
+    if (!displayChains.length) { el.innerHTML = '<div class=\"empty\">暂无历史链式条件</div>'; return; }
+
+    let html = '';
+    displayChains.forEach((ch, ci) => {
+      // 链内按触发时间倒序
+      const sorted = ch.items.sort((a, b) => ((b.triggered_at || b.created || '') > (a.triggered_at || a.created || '')) ? 1 : -1);
+      const chainLabel = ch.chain_id.startsWith('ai-') ? ch.chain_id.substring(0, 24) : ch.chain_id.substring(0, 18);
+      const codes = [...ch.codes].join(',');
+      const origin = (ch.origin_note || '').slice(0, 60);
+
+      // 链头（折叠式）
+      html += `<div style="background:#1c2128;border:1px solid #30363d;border-radius:6px;margin-bottom:10px;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;cursor:pointer;font-size:12px"
+             onclick="const n=this.nextElementSibling;n.style.display=n.style.display==='none'?'table':'none';this.querySelector('.arrow').textContent=n.style.display==='none'?'▶':'▼'">
+          <span style="display:flex;gap:10px;align-items:center">
+            <span class="arrow">▶</span>
+            <span style="color:#58a6ff;font-weight:500">🔗 ${chainLabel}</span>
+            <span style="color:#8b949e">${codes}</span>
+            <span style="color:#d29922;font-size:11px">${ch.items.length}笔</span>
+            <span style="color:#484f58;font-size:11px">${ch.last_time||''}</span>
+          </span>
+          <span style="color:#8b949e;font-size:11px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${origin}</span>
+        </div>
+        <div style="display:none;width:100%">
+        <table class="cond-table"><thead><tr>
+          <th>环</th><th>代码</th><th>名称</th><th>方向</th><th>触发价</th><th>股数</th><th>状态</th><th>触发时间</th><th>提示词</th>
+        </tr></thead><tbody>${
+          sorted.map((c, i) => {
+            const p = typeof c.params === 'string' ? (JSON.parse(c.params)||{}) : (c.params||{});
+            const istate = c.internal_state || {};
+            const seq = istate._seq || (ch.items.length - i);
+            const isOrigin = c.id === ch.chain_id;
+            const originNote = (istate._origin_note || ch.origin_note || '').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+            return `<tr style="${isOrigin?'background:#0d1117':''}" data-chain-id="${ch.chain_id}" data-origin="${originNote}" data-code="${c.code}" data-type="${c.type}" data-side="${c.side}" data-shares="${c.shares||0}">
+              <td style="text-align:center;font-size:11px;color:#484f58">${seq}</td>
+              <td class="code">${c.code}</td>
+              <td>${c.name||''}</td>
+              <td class="${c.side}">${c.side==='buy'?'买入':'卖出'}</td>
+              <td>${p.trigger_price||p.monitor_price||''}</td>
+              <td>${c.shares||0}</td>
+              <td class="${c.status}" style="font-size:11px">${c.status==='triggered'?'✅触发':c.status==='cancelled'?'❌取消':c.status==='expired'?'⏰过期':c.status}</td>
+              <td style="font-size:11px;color:#484f58">${c.triggered_at||c.created||''}</td>
+              <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#8b949e;cursor:pointer" ondblclick="showFullNote(this,'${(c.note||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}')">${(c.note||'').slice(0,35)}</td>
+            </tr>`;
+          }).join('')
+        }</tbody></table>
+        </div></div>`;
+    });
+
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = `<div class="empty">❌ ${e.message}</div>`; }
+}
+
+// ── Toast通知 ──
+async function showAiDecision(cid) {
+  try {
+    const r = await fetch('/daemon/ai-stats'); const d = await r.json();
+    const chains = (d.chains||[]).filter(c => c.chain_id === cid);
+    if (!chains.length) { showToast('暂无AI决策记录'); return; }
+    const c = chains[0];
+    showToast(`🤖 AI决策 (@${c.first_call})\n链长:${c.chain_length}  ℱ:${c.friction_pct}%\n调用:${c.calls}次 交易:${c.trades}笔`, 6000);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+// ── 全局折叠/展开 ──
+let _allExpanded = false;
+function toggleAllChains() {
+  _allExpanded = !_allExpanded;
+  const btn = document.querySelector('#tab3 .tab2-toolbar .btn:nth-child(2)');
+  btn.textContent = _allExpanded ? '🔼 全部折叠' : '🔽 全部展开';
+  document.querySelectorAll('#historyContent > div').forEach(ch => {
+    const tables = ch.querySelectorAll('table');
+    if (tables.length) {
+      const body = tables[0].closest('div') || ch.querySelector('div:nth-child(2)');
+      if (body && body !== ch.querySelector('div:first-child')) {
+        body.style.display = _allExpanded ? 'table' : 'none';
+        const arrow = ch.querySelector('.arrow');
+        if (arrow) arrow.textContent = _allExpanded ? '▼' : '▶';
+      }
+    }
+  });
+}
+
+function showFullNote(el, note) {
+  const row = el.closest('tr');
+  if (!row) { showToast(`📝 ${note || '（空）'}`, 8000); return; }
+
+  const chainId = row.dataset?.chainId || '';
+  const origin = row.dataset?.origin || '';
+  const code = row.dataset?.code || '';
+  const ctype = row.dataset?.type || '';
+  const side = row.dataset?.side || '';
+  const shares = row.dataset?.shares || '';
+
+  // 拼基本信息
+  let msg = `📋 条件: ${code} ${side==='buy'?'买入':'卖出'} ${shares}股\n`;
+  msg += `🧩 类型: ${ctype.replace('call_ai_','')}\n`;
+  msg += `📝 备注: ${note || '—'}\n`;
+  if (origin && origin !== note) msg += `📜 原始策略: ${origin.slice(0,120)}\n`;
+
+  if (!chainId) { showToast(msg, 8000); return; }
+
+  // 取AI决策链详情
+  fetch('/daemon/ai-stats').then(r=>r.json()).then(data => {
+    const match = (data.chains||[]).filter(c => c.chain_id === chainId);
+    if (!match.length) { showToast(msg, 8000); return; }
+    const c = match[0];
+    msg += `\n🤖 AI链 ${chainId.slice(0,22)}…\n`;
+    msg += `  调用${c.calls}次 | 交易${c.trades}笔 | 链长${c.chain_length} | ℱ=${c.friction_pct}%\n`;
+    msg += `  ⏱ ${c.first_call} → ${c.last_call}\n`;
+
+    // 从后端取逐条详情
+    fetch(`/daemon/ai-stats/detail/${encodeURIComponent(chainId)}`).then(r2=>r2.json()).then(detail => {
+      if (detail.details && detail.details.length) {
+        detail.details.forEach((d, i) => {
+          const analysis = (d.analysis || '—').slice(0, 120);
+          const llm = d.llm_response || '';
+          const action = d.action || '';
+          msg += `\n第${i+1}轮 [${action}] ${analysis}`;
+          // 取AI下发的条件
+          try {
+            const parsed = JSON.parse(llm);
+            if (parsed.conditions) {
+              parsed.conditions.forEach(cond => {
+                msg += `\n  → ${cond.type||'?'} ${cond.side||'?'} ${cond.shares||'?'}股 @${cond.trigger_price||cond.monitor_price||'?'}`;
+              });
+            }
+          } catch(e) {}
+        });
+      }
+      showToast(msg, 12000);
+    }).catch(() => showToast(msg, 8000));
+  }).catch(() => showToast(msg, 8000));
+}
+
+function showToast(msg, duration) {
+   let t = document.getElementById('toast');
+   if (!t) { t = document.createElement('div'); t.id = 'toast';
+     t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 20px;font-size:13px;z-index:999;transition:.3s;';
+     document.body.appendChild(t); }
+   t.innerHTML = msg.replace(/\n/g, '<br>');
+   t.style.opacity = '1';
+   clearTimeout(t._timer);
+   t._timer = setTimeout(() => { t.style.opacity = '0'; }, duration || 4000);
+}
+// ── 限制/资金 ──
+let fundMode = 'add';
+function showFundInput(mode) { fundMode = mode;
+  document.getElementById('fundInput').style.display = 'inline-block';
+  document.getElementById('fundInput').focus();
+  document.getElementById('fundAddBtn').style.display = 'none';
+  document.getElementById('fundSubBtn').style.display = 'none'; }
+async function doFund() {
+  const inp = document.getElementById('fundInput');
+  const val = parseFloat(inp.value);
+  if (isNaN(val)||val<=0) { inp.style.display='none'; resetFundBtns(); return; }
+  const amount = fundMode==='add' ? val*10000 : -val*10000;
+  const r = await fetch('/daemon/fund', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({amount}) });
+  const d = await r.json();
+  if (d.status!=='ok') showToast(d.error||'操作失败');
+  inp.value=''; inp.style.display='none'; resetFundBtns(); loadRestrictions();
+}
+function resetFundBtns() { document.getElementById('fundAddBtn').style.display='inline'; document.getElementById('fundSubBtn').style.display='inline'; }
+
+function showMinCashInput() { document.getElementById('minCashInput').style.display='inline-block'; document.getElementById('minCashInput').focus(); document.getElementById('minCashDisplay').style.display='none'; document.getElementById('minCashEditBtn').style.display='none'; }
+async function saveMinCash(el) { const v=parseFloat(el.value); if(!isNaN(v)&&v>=0&&v<=50) fetch('/daemon/restrictions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({min_cash_reserve_pct:v})}).then(()=>loadRestrictions()); document.getElementById('minCashInput').style.display='none'; document.getElementById('minCashDisplay').style.display='inline'; document.getElementById('minCashEditBtn').style.display='inline'; }
+function showMaxPosSelect() { document.getElementById('maxPosInput').style.display='inline-block'; document.getElementById('maxPosInput').focus(); document.getElementById('maxPosDisplay').style.display='none'; document.getElementById('maxPosEditBtn').style.display='none'; }
+function hideMaxPosSelect() { document.getElementById('maxPosInput').style.display='none'; document.getElementById('maxPosDisplay').style.display='inline'; document.getElementById('maxPosEditBtn').style.display='inline'; }
+async function updateRestriction(key,val) { await fetch('/daemon/restrictions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({[key]:val})}); hideMaxPosSelect(); }
+
+async function loadRestrictions() {
+  const bar = document.getElementById('restrictionsBar');
+  try {
+    const [r,f] = await Promise.all([fetch('/daemon/restrictions').then(r=>r.json()), fetch('/daemon/fund').then(r=>r.json())]);
+    const d=r;
+    bar.innerHTML = `
+      <span class="tag">💰 资金池 <strong>¥${(f.cash/10000).toFixed(1)}万</strong>
+        <span style="font-size:10px;color:#484f58">（已投${(f.total_deposits/10000).toFixed(1)}万）</span>
+        <input type="number" id="fundInput" style="display:none;width:70px;font-size:11px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:1px 4px;margin-left:4px"
+          placeholder="万元" step="1" min="0" onkeydown="if(event.key==='Enter')doFund()">
+        <span id="fundAddBtn" style="cursor:pointer;font-size:10px;color:#238636;margin-left:4px" onclick="showFundInput('add')">＋追加</span>
+        <span id="fundSubBtn" style="cursor:pointer;font-size:10px;color:#da3633;margin-left:2px" onclick="showFundInput('sub')">－取出</span>
+        <span id="fundTip" style="font-size:10px;color:#484f58;margin-left:4px">（最多可取约¥${Math.max(0,f.cash * (1 - (d.min_cash_reserve_pct||5)/100) / 10000).toFixed(1)}万）</span>
+      </span>
+      <span class="tag">📊 单标仓位 <strong>${d.max_single_position_pct}%</strong></span>
+      <span class="tag">📋 最大持仓 <strong id="maxPosDisplay">${d.max_positions}</strong>只
+        <select id="maxPosInput" style="display:none;font-size:11px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:1px 4px;margin-left:4px"
+          onchange="updateRestriction('max_positions',parseInt(this.value))" onblur="hideMaxPosSelect()">
+          ${Array.from({length:20},(_,i)=>`<option value="${i+1}" ${i+1==d.max_positions?'selected':''}>${i+1}只</option>`).join('')}
+        </select>
+        <span id="maxPosEditBtn" style="cursor:pointer;font-size:10px;color:#8b949e;margin-left:2px" onclick="showMaxPosSelect()">✏️</span>
+      </span>
+      <strong>💵 保底现金 <span id="minCashDisplay">${d.min_cash_reserve_pct||5}%</span></strong>
+        <input type="number" id="minCashInput" style="display:none;width:60px;font-size:11px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:1px 4px;margin-left:4px"
+          value="${d.min_cash_reserve_pct||5}" step="1" min="0" max="50"
+          onblur="saveMinCash(this)" onkeydown="if(event.key==='Enter')saveMinCash(this)">
+        <span id="minCashEditBtn" style="cursor:pointer;font-size:10px;color:#8b949e;margin-left:2px" onclick="showMinCashInput()">✏️</span>
+      </span>`;
+  } catch { bar.innerHTML = '<span class="tag">⚠️ daemon不可达</span>'; }
+}
+
+// ── 预设 ──
+function loadPresets() {
+  document.getElementById('presets').innerHTML = PRESETS.map((p,i) =>
+    `<button class="preset-btn" onclick="applyPreset(${i})">📌 ${p.label}</button>`).join('');
+}
+function applyPreset(idx) { document.getElementById('entries').innerHTML=''; entryCount=0; PRESETS[idx].stocks.forEach(s=>addEntry(s)); }
+
+// ── Init ──
+async function init() {
+  try { const r = await fetch('/api/stocks'); allStocks = await r.json(); } catch(e) {}
+  await loadRestrictions();
+  loadPresets();
+  addEntry();
+}
+init();
+</script>
+</body>
+</html>
