@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>因子数据库浏览器</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background: #0d1117; color: #c9d1d9; min-height: 100vh; }
+
+.header { background: #161b22; border-bottom: 1px solid #30363d; padding: 16px 24px; position: sticky; top: 0; z-index: 100; }
+.mode-switch { display: flex; gap: 6px; margin-bottom: 10px; }
+.mode-btn {
+  padding: 5px 16px; font-size: 12px; border-radius: 6px; cursor: pointer;
+  border: 1px solid #30363d; background: #0d1117; color: #8b949e;
+}
+.mode-btn.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+.mode-btn:hover:not(.active) { border-color: #58a6ff; color: #c9d1d9; }
+.controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.control-group { display: flex; flex-direction: column; gap: 3px; position: relative; }
+.control-group label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+.control-group select, .control-group input {
+  background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+  color: #c9d1d9; padding: 6px 10px; font-size: 13px; min-width: 160px;
+}
+.control-group select:focus, .control-group input:focus { outline: none; border-color: #58a6ff; }
+.btn {
+  background: #238636; border: 1px solid rgba(240,246,252,0.1); border-radius: 6px;
+  color: #fff; padding: 6px 16px; font-size: 13px; cursor: pointer; height: 32px;
+}
+.btn:hover { background: #2ea043; }
+.stock-count { font-size: 12px; color: #8b949e; margin-left: 8px; }
+.mode-panel { display: none; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.mode-panel.active { display: flex; }
+
+/* ── 股票搜索框 ── */
+.search-wrapper { position: relative; }
+.stock-search {
+  min-width: 200px; height: 32px; padding: 6px 10px; font-size: 13px;
+  background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+  color: #c9d1d9;
+}
+.stock-search:focus { outline: none; border-color: #58a6ff; }
+.stock-search.selected { border-color: #238636; }
+.search-dropdown {
+  display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 200;
+  background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+  max-height: 320px; overflow-y: auto; margin-top: 2px;
+}
+.search-dropdown.open { display: block; }
+.search-item {
+  padding: 5px 10px; cursor: pointer; font-size: 12px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.search-item:hover, .search-item.highlight { background: #1c2128; color: #58a6ff; }
+.search-item .sym { color: #58a6ff; font-weight: 500; }
+.search-item .nam { color: #c9d1d9; }
+.search-item .tag {
+  font-size: 10px; color: #8b949e; background: #0d1117;
+  padding: 1px 6px; border-radius: 4px;
+}
+.search-noresults { padding: 10px; text-align: center; color: #484f58; font-size: 12px; }
+
+.main { display: flex; height: calc(100vh - 110px); }
+.sidebar {
+  width: 260px; min-width: 260px; background: #161b22;
+  border-right: 1px solid #30363d; overflow-y: auto; padding: 8px 0;
+}
+.sidebar-title { font-size: 11px; color: #8b949e; padding: 8px 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+.category-item {
+  padding: 7px 14px; cursor: pointer; font-size: 13px;
+  display: flex; align-items: center; gap: 8px; border-left: 3px solid transparent;
+}
+.category-item:hover { background: #1c2128; }
+.category-item.active { background: #1c2128; border-left-color: #58a6ff; color: #58a6ff; }
+.category-item .icon { font-size: 14px; }
+.category-item .count { margin-left: auto; font-size: 11px; color: #8b949e; }
+.category-item .chevron { font-size: 9px; color: #484f58; margin-left: 4px; transition: transform .15s; }
+.category-item .chevron.open { transform: rotate(90deg); }
+.category-item .cat-checkbox { margin: 0 4px 0 0; accent-color: #58a6ff; cursor: pointer; flex-shrink: 0; }
+.category-item .cat-label {
+  display: flex; align-items: center; gap: 8px; flex: 1; cursor: pointer; min-width: 0;
+}
+.category-item .cat-label:hover { color: #c9d1d9; }
+.sub-cols { display: none; padding-left: 38px; padding-bottom: 4px; }
+.sub-cols.open { display: block; }
+.sub-col-item { font-size: 11px; color: #8b949e; padding: 2px 0; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.sub-col-item:hover { color: #c9d1d9; }
+.sub-col-item input { accent-color: #58a6ff; }
+
+.content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.toolbar {
+  padding: 8px 16px; background: #161b22; border-bottom: 1px solid #30363d;
+  display: flex; align-items: center; gap: 12px; font-size: 12px; flex-wrap: wrap;
+}
+.toolbar .info { color: #8b949e; }
+.toolbar .null-info { color: #484f58; font-size: 11px; }
+.table-wrap { flex: 1; overflow: auto; }
+table { border-collapse: collapse; font-size: 12px; }
+thead { position: sticky; top: 0; z-index: 10; }
+th {
+  position: relative; background: #21262d; color: #8b949e; font-weight: 500;
+  text-align: left; padding: 6px 10px; border-bottom: 1px solid #30363d;
+  border-right: 1px solid #21262d; white-space: nowrap; font-size: 11px;
+  user-select: none; min-width: 40px;
+}
+th.cat-header {
+  background: #1c2128; color: #484f58; font-size: 10px; font-weight: 400;
+  text-align: center; padding: 3px 10px; letter-spacing: 0.3px;
+  border-bottom: 1px solid #30363d; border-right: 1px solid #21262d;
+  user-select: none; position: static;
+}
+th .resizer {
+  display: inline-block; position: absolute; right: 0; top: 0; bottom: 0;
+  width: 5px; cursor: col-resize; background: transparent; z-index: 20;
+}
+th .resizer:hover, th .resizer.resizing { background: #58a6ff; opacity: 0.6; }
+th .null-badge {
+  display: none; font-size: 9px; color: #484f58; margin-left: 4px;
+}
+th .null-badge.high { display: inline; }
+td {
+  padding: 5px 10px; border-bottom: 1px solid #21262d; border-right: 1px solid #161b22;
+  white-space: nowrap; font-size: 12px; overflow: hidden; text-overflow: ellipsis;
+}
+tr:hover td { background: #1c2128; }
+td.symbol { color: #58a6ff; font-weight: 500; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.null { color: #30363d; text-align: center; font-size: 11px; background: #0a0e12; }
+
+.loading, .empty { text-align: center; padding: 40px 20px; color: #8b949e; }
+.loading .spinner {
+  border: 2px solid #30363d; border-top: 2px solid #58a6ff;
+  border-radius: 50%; width: 24px; height: 24px;
+  animation: spin 1s linear infinite; margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty .big-icon { font-size: 32px; margin-bottom: 8px; }
+
+.status-bar {
+  background: #161b22; border-top: 1px solid #30363d;
+  padding: 4px 16px; font-size: 11px; color: #8b949e;
+  display: flex; justify-content: space-between; z-index: 5;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #0d1117; }
+::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #484f58; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="mode-switch">
+    <button class="mode-btn active" id="modeStockBtn" onclick="switchMode('stock')">🔍 单股票查询</button>
+    <button class="mode-btn" id="modeDateBtn" onclick="switchMode('date')">📅 单日查询</button>
+  </div>
+  <div class="controls">
+    <div class="mode-panel active" id="panelStock">
+      <div class="control-group search-wrapper">
+        <label>股票</label>
+        <input type="text" class="stock-search" id="stockSearch" placeholder="输入代码或名称..." autocomplete="off" spellcheck="false">
+        <div class="search-dropdown" id="stockDropdown"></div>
+      </div>
+      <div class="control-group">
+        <label>日期从</label>
+        <input type="date" id="stockDateFrom">
+      </div>
+      <div class="control-group">
+        <label>到</label>
+        <input type="date" id="stockDateTo">
+      </div>
+    </div>
+    <div class="mode-panel" id="panelDate">
+      <div class="control-group">
+        <label>日期</label>
+        <input type="date" id="singleDate">
+      </div>
+    </div>
+    <button class="btn" onclick="loadData()">🔄 查询</button>
+    <span class="stock-count" id="resultCount"></span>
+  </div>
+</div>
+
+<div class="main">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-title">因子分类</div>
+  </div>
+  <div class="content">
+    <div class="toolbar">
+      <span class="info" id="resultInfo">等待查询...</span>
+      <span class="info" id="selectedColsInfo"></span>
+      <span class="null-info" id="nullInfo"></span>
+    </div>
+    <div class="table-wrap" id="tableWrap" onscroll="onTableScroll()">
+      <table id="dataTable">
+        <thead id="tableHead"><tr></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="loading" id="loadingIndicator" style="display:none">
+        <div class="spinner"></div>
+        <div>加载中...</div>
+      </div>
+      <div class="empty" id="emptyIndicator" style="display:none">
+        <div class="big-icon">🔍</div>
+        <div id="emptyText">选择条件后点击查询</div>
+      </div>
+    </div>
+    <div class="status-bar">
+      <span id="statusLeft"></span>
+      <span id="statusRight"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let allStocks = [], allDates = [], categories = [];
+let selectedCols = new Set();
+let currentPage = 1, currentTotal = 0, currentTotalPages = 0;
+let isLoading = false, hasMore = true;
+let currentMode = 'stock';
+let selectedSymbol = '';        // 当前选中的股票代码
+let searchHighlight = -1;       // 搜索下拉高亮索引
+let lastNullRates = {};         // 列空值率缓存
+
+// ── 列宽 ──
+const COL_WIDTHS = {
+  date:80, symbol:68, name:88, price:75, price_change:70,
+  pe_ttm:72, pb:72, ps:72, pcf:72, ma5:78, ma10:78, ma20:78, ma60:78,
+  ema12:78, ema26:78, ema9:78, rsi6:62, rsi12:62, rsi24:62, macd:78,
+  atr14:70, boll_upper:80, boll_middle:80, boll_lower:80, boll_bw:62,
+  volume_ratio:70, turnover_rate:70, turnover_ratio:70,
+  ret_1d:65, ret_5d:65, ret_20d:68, ret_60d:68, high_52w_pct:72,
+  entry_score:62, entry_level:72, trend_score:62, trend_level:72,
+  val_score:62, val_level:72, msci_composite:70, msci_level:72, ema9_trend:68,
+};
+const DEFAULT_COL_WIDTH = 70;
+function getColWidth(col) { return COL_WIDTHS[col] || DEFAULT_COL_WIDTH; }
+
+// ── 列规范顺序（按分类，保证col-row连续不碎片）──
+let canonicalOrder = null;
+function ensureCanonicalOrder() {
+  if (canonicalOrder) return;
+  canonicalOrder = ['date','symbol','name'];
+  categories.forEach(cat => cat.cols.forEach(c => { if (!canonicalOrder.includes(c)) canonicalOrder.push(c); }));
+}
+function sortByCanonical(cols) {
+  ensureCanonicalOrder();
+  return Array.from(cols).sort((a,b) => {
+    const ia = canonicalOrder.indexOf(a);
+    const ib = canonicalOrder.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+}
+
+// ── 股票搜索 ──
+let searchTimeout = null;
+function initStockSearch() {
+  const input = document.getElementById('stockSearch');
+  const dropdown = document.getElementById('stockDropdown');
+
+  input.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => doSearch(input.value), 150);
+    selectedSymbol = '';
+    input.classList.remove('selected');
+  });
+
+  input.addEventListener('focus', () => {
+    if (input.value) doSearch(input.value);
+    else showAllStocks();
+  });
+
+  input.addEventListener('keydown', e => {
+    const items = dropdown.querySelectorAll('.search-item');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      searchHighlight = Math.min(searchHighlight + 1, items.length - 1);
+      highlightItem(items);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      searchHighlight = Math.max(searchHighlight - 1, 0);
+      highlightItem(items);
+    } else if (e.key === 'Enter' && searchHighlight >= 0 && items[searchHighlight]) {
+      e.preventDefault();
+      items[searchHighlight].click();
+    } else if (e.key === 'Escape') {
+      dropdown.classList.remove('open');
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.search-wrapper')) dropdown.classList.remove('open');
+  });
+}
+
+function highlightItem(items) {
+  items.forEach((el, i) => el.classList.toggle('highlight', i === searchHighlight));
+  const h = items[searchHighlight];
+  if (h) h.scrollIntoView({ block: 'nearest' });
+}
+
+function doSearch(q) {
+  const dropdown = document.getElementById('stockDropdown');
+  searchHighlight = -1;
+  if (!q || q.length < 1) { showAllStocks(); return; }
+
+  const ql = q.toLowerCase();
+  // 按代码精确>代码模糊>名称模糊排序
+  let exact = [], codeMatch = [], nameMatch = [];
+  allStocks.forEach(s => {
+    if (s.symbol === ql) exact.push(s);
+    else if (s.symbol.includes(ql)) codeMatch.push(s);
+    else if (s.name.includes(q) || s.name.toLowerCase().includes(ql)) nameMatch.push(s);
+  });
+  const results = [...exact, ...codeMatch, ...nameMatch].slice(0, 50);
+
+  if (results.length === 0) {
+    dropdown.innerHTML = '<div class="search-noresults">没有匹配的股票</div>';
+    dropdown.classList.add('open');
+    return;
+  }
+  dropdown.innerHTML = results.map((s, i) =>
+    `<div class="search-item" data-index="${i}" onclick="selectStock('${s.symbol}','${s.name.replace(/'/g,"\\'")}')">
+      <span><span class="sym">${s.symbol}</span> <span class="nam">${s.name}</span></span>
+      <span class="tag">${s.symbol.startsWith('6')?'SH':s.symbol.startsWith('0')||s.symbol.startsWith('3')?'SZ':'BJ'}</span>
+    </div>`
+  ).join('');
+  dropdown.classList.add('open');
+}
+
+function showAllStocks() {
+  const dropdown = document.getElementById('stockDropdown');
+  searchHighlight = -1;
+  const batch = allStocks.slice(0, 30);
+  dropdown.innerHTML = batch.map((s, i) =>
+    `<div class="search-item" data-index="${i}" onclick="selectStock('${s.symbol}','${s.name.replace(/'/g,"\\'")}')">
+      <span><span class="sym">${s.symbol}</span> <span class="nam">${s.name}</span></span>
+      <span class="tag">${s.symbol.startsWith('6')?'SH':s.symbol.startsWith('0')||s.symbol.startsWith('3')?'SZ':'BJ'}</span>
+    </div>`
+  ).join('');
+  dropdown.innerHTML += '<div class="search-noresults" style="font-size:10px;padding:4px">共' + allStocks.length + '只 — 输入代码/名称搜索</div>';
+  dropdown.classList.add('open');
+}
+
+function selectStock(symbol, name) {
+  selectedSymbol = symbol;
+  document.getElementById('stockSearch').value = symbol + ' ' + name;
+  document.getElementById('stockSearch').classList.add('selected');
+  document.getElementById('stockDropdown').classList.remove('open');
+}
+
+// ── Init ──
+async function init() {
+  await Promise.all([loadStocks(), loadDates(), loadCategories()]);
+  setupSidebar();
+  initStockSearch();
+}
+async function loadStocks() {
+  const r = await fetch('/api/stocks');
+  allStocks = await r.json();
+}
+async function loadDates() {
+  const r = await fetch('/api/dates');
+  allDates = await r.json();
+  if (allDates.length) {
+    const last = allDates[0];
+    document.getElementById('stockDateTo').value = last;
+    document.getElementById('stockDateFrom').value = allDates[Math.min(3, allDates.length-1)];
+    document.getElementById('singleDate').value = last;
+  }
+}
+async function loadCategories() {
+  const r = await fetch('/api/categories');
+  categories = await r.json();
+}
+
+// ── Mode switch ──
+function switchMode(mode) {
+  currentMode = mode;
+  document.getElementById('modeStockBtn').classList.toggle('active', mode === 'stock');
+  document.getElementById('modeDateBtn').classList.toggle('active', mode === 'date');
+  document.getElementById('panelStock').classList.toggle('active', mode === 'stock');
+  document.getElementById('panelDate').classList.toggle('active', mode === 'date');
+}
+
+// ── Sidebar ──
+function setupSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  categories.forEach((cat, idx) => {
+    const item = document.createElement('div');
+    item.className = 'category-item';
+    item.innerHTML = `
+      <input type="checkbox" class="cat-checkbox" id="catCheck-${idx}" onchange="toggleCategoryAll(${idx}, this.checked)">
+      <span class="cat-label" onclick="toggleCategoryFold(${idx})">
+        <span class="icon">${cat.icon}</span>
+        <span>${cat.label}</span>
+        <span class="count" id="catCount-${idx}">0/${cat.cols.length}</span>
+        <span class="chevron" id="catChevron-${idx}">▶</span>
+      </span>`;
+    sidebar.appendChild(item);
+    const sub = document.createElement('div');
+    sub.className = 'sub-cols'; sub.id = `sub-${idx}`;
+    sub.innerHTML = cat.cols.map(col =>
+      `<label class="sub-col-item"><input type="checkbox" value="${col}" data-cat="${idx}" onchange="toggleSingleCol('${col}',${idx})"><span>${col}</span></label>`
+    ).join('');
+    sidebar.appendChild(sub);
+  });
+}
+
+// 折叠/展开
+function toggleCategoryFold(idx) {
+  const sub = document.getElementById(`sub-${idx}`);
+  sub.classList.toggle('open');
+  document.getElementById(`catChevron-${idx}`).classList.toggle('open', sub.classList.contains('open'));
+}
+
+// 全选/全取消
+function toggleCategoryAll(idx, checked) {
+  const cat = categories[idx];
+  cat.cols.forEach(c => {
+    if (checked) selectedCols.add(c);
+    else selectedCols.delete(c);
+  });
+  // 同步子复选框
+  document.querySelectorAll(`#sub-${idx} input[type="checkbox"]`).forEach(cb => cb.checked = checked);
+  // 高亮
+  document.querySelectorAll('.category-item').forEach((el, i) => {
+    if (i === idx) el.classList.toggle('active', checked);
+  });
+  updateCategoryCount(cat, idx);
+  updateSelectedColsInfo();
+}
+
+function updateCategoryCount(cat, idx) {
+  const n = cat.cols.filter(c => selectedCols.has(c)).length;
+  const el = document.getElementById(`catCount-${idx}`);
+  if (el) el.textContent = `${n}/${cat.cols.length}`;
+}
+
+function toggleSingleCol(col, catIdx) {
+  if (selectedCols.has(col)) selectedCols.delete(col);
+  else selectedCols.add(col);
+  // 更新复选框
+  document.querySelectorAll(`input[value="${col}"]`).forEach(cb => cb.checked = selectedCols.has(col));
+  // 更新所属分类状态
+  const cat = categories[catIdx];
+  if (cat) {
+    updateCategoryCount(cat, catIdx);
+    const allSelected = cat.cols.every(c => selectedCols.has(c));
+    const noneSelected = cat.cols.every(c => !selectedCols.has(c));
+    const catCheck = document.getElementById(`catCheck-${catIdx}`);
+    if (catCheck) {
+      catCheck.checked = allSelected;
+      catCheck.indeterminate = !allSelected && !noneSelected;
+    }
+    document.querySelectorAll('.category-item').forEach((el, i) => {
+      if (i === catIdx) el.classList.toggle('active', allSelected);
+    });
+  }
+  updateSelectedColsInfo();
+}
+
+function updateSelectedColsInfo() {
+  document.getElementById('selectedColsInfo').textContent = selectedCols.size > 0 ? `已选${selectedCols.size}个因子` : '';
+}
+
+// ── 列宽拖拽 ──
+let resizeTarget = null, resizeStartX = 0, resizeStartW = 0;
+function initResize(idx) {
+  const ths = document.querySelectorAll('#tableHead .col-row th');
+  if (idx >= ths.length) return;
+  resizeTarget = ths[idx]; resizeStartX = event.clientX; resizeStartW = resizeTarget.offsetWidth;
+  document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none';
+  document.addEventListener('mousemove', doResize);
+  document.addEventListener('mouseup', stopResize);
+}
+function doResize(e) {
+  if (!resizeTarget) return;
+  const nw = Math.max(40, resizeStartW + e.clientX - resizeStartX);
+  resizeTarget.style.width = nw + 'px'; resizeTarget.style.minWidth = nw + 'px';
+}
+function stopResize() {
+  resizeTarget = null; document.body.style.cursor = ''; document.body.style.userSelect = '';
+  document.removeEventListener('mousemove', doResize); document.removeEventListener('mouseup', stopResize);
+}
+
+// ── 查询 ──
+async function loadData(reset = true) {
+  if (reset) { currentPage = 1; hasMore = true; document.getElementById('tableBody').innerHTML = ''; document.getElementById('emptyIndicator').style.display = 'none'; }
+  if (isLoading || !hasMore) return;
+  isLoading = true;
+  document.getElementById('loadingIndicator').style.display = '';
+
+  let symbols = '', dateFrom = '', dateTo = '';
+  if (currentMode === 'stock') {
+    symbols = selectedSymbol;
+    dateFrom = document.getElementById('stockDateFrom').value;
+    dateTo = document.getElementById('stockDateTo').value;
+  } else {
+    dateFrom = dateTo = document.getElementById('singleDate').value;
+  }
+
+  const cols = sortByCanonical(selectedCols).join(',');
+  try {
+    const url = `/api/factors?page=${currentPage}&limit=200`
+      + (symbols ? `&symbols=${encodeURIComponent(symbols)}` : '')
+      + (dateFrom ? `&date_from=${encodeURIComponent(dateFrom)}` : '')
+      + (dateTo ? `&date_to=${encodeURIComponent(dateTo)}` : '')
+      + (cols ? `&cols=${encodeURIComponent(cols)}` : '');
+
+    const r = await fetch(url);
+    const data = await r.json();
+    if (reset) {
+      currentTotal = data.total; currentTotalPages = data.total_pages;
+      renderTableHead(data.columns, data.rows);
+      document.getElementById('tableBody').innerHTML = '';
+      document.getElementById('resultInfo').textContent = `共 ${data.total} 条记录`;
+    }
+    renderRows(data.rows, data.columns);
+    currentPage++; hasMore = currentPage <= currentTotalPages;
+    document.getElementById('resultCount').textContent = `已加载 ${(currentPage-1)*200} / ${currentTotal} 条`;
+    document.getElementById('statusLeft').textContent = `${symbols || '全部'} — ${currentPage-1} 页`;
+    document.getElementById('statusRight').textContent = `显示 ${Math.min((currentPage-1)*200, currentTotal)} / ${currentTotal} 条`;
+    if (data.total === 0) { document.getElementById('emptyIndicator').style.display = ''; document.getElementById('emptyText').textContent = '没有匹配的数据'; }
+  } catch(e) {
+    document.getElementById('resultInfo').textContent = '查询失败: ' + e.message;
+  }
+  isLoading = false;
+  document.getElementById('loadingIndicator').style.display = 'none';
+
+  const tryFill = () => {
+    if (!hasMore || isLoading) return;
+    const w = document.getElementById('tableWrap');
+    if (w.scrollHeight <= w.clientHeight + 2) loadData(false);
+  };
+  if (hasMore) setTimeout(tryFill, reset ? 400 : 100);
+}
+
+// ── 表头渲染（分类行+字段行+空值率badge）──
+function renderTableHead(cols, rows) {
+  // 计算空值率
+  if (rows && rows.length > 0) {
+    const dataCols = cols.filter(c => !['date','symbol','name'].includes(c));
+    dataCols.forEach(c => {
+      const n = rows.filter(r => r[c] == null || r[c] === 'None').length;
+      lastNullRates[c] = n / rows.length;
+    });
+  }
+
+  // 构建 列名→分类 映射
+  const catMap = {};
+  categories.forEach(cat => cat.cols.forEach(c => catMap[c] = cat.label));
+  catMap.date = '基础信息';
+  catMap.symbol = '基础信息';
+  catMap.name = '基础信息';
+
+  // 按连续列分组（同一分类的相邻列合并）
+  const groups = [];
+  let currentCat = null;
+  cols.forEach((c, i) => {
+    const cat = catMap[c] || '其他';
+    if (cat === currentCat) {
+      groups[groups.length - 1].count++;
+    } else {
+      currentCat = cat;
+      groups.push({cat, count: 1, startIdx: i});
+    }
+  });
+
+  // 构建表头HTML：分类行 + 字段行
+  const thead = document.getElementById('tableHead');
+  thead.innerHTML = `
+    <tr class="cat-row">${groups.map(g => `<th class="cat-header" colspan="${g.count}">${g.cat}</th>`).join('')}</tr>
+    <tr class="col-row">${cols.map((c, i) => {
+      const label = {date:'日期',symbol:'代码',name:'名称'}[c] || c;
+      const w = getColWidth(c);
+      const nr = lastNullRates[c];
+      const badge = (nr != null && nr > 0.7) ? `<span class="null-badge high">${(nr*100).toFixed(0)}%空</span>` : '';
+      return `<th style="width:${w}px;min-width:${w}px">
+        <span class="col-label">${label}</span>${badge}
+        <span class="resizer" onmousedown="initResize(${i});event.stopPropagation();"></span>
+      </th>`;
+    }).join('')}</tr>`;
+
+  // 空值率提示
+  const highNull = Object.entries(lastNullRates).filter(([,v]) => v > 0.7).map(([k]) => k);
+  document.getElementById('nullInfo').textContent = highNull.length > 0
+    ? `⚠ ${highNull.length}列空值率>70% (灰色标注)`
+    : '';
+}
+
+function renderRows(rows, cols) {
+  const tb = document.getElementById('tableBody');
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = cols.map(c => {
+      let v = r[c], cls = '';
+      if (v == null || v === 'None') { v = '—'; cls = 'null'; }
+      else if (c === 'symbol') cls = 'symbol';
+      else if (typeof v === 'number') { v = v % 1 === 0 ? v.toLocaleString() : v.toFixed(2); cls = 'num'; }
+      return `<td class="${cls}">${v}</td>`;
+    }).join('');
+    tb.appendChild(tr);
+  });
+}
+
+function onTableScroll() {
+  const w = document.getElementById('tableWrap');
+  if (w.scrollTop + w.clientHeight >= w.scrollHeight - 200)
+    if (!isLoading && hasMore) loadData(false);
+}
+
+// ── 键盘 ──
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey||e.metaKey) && e.key === 'Enter') loadData();
+  if (e.key === 'Escape') document.getElementById('stockDropdown').classList.remove('open');
+});
+
+init();
+</script>
+</body>
+</html>
